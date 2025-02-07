@@ -26,7 +26,7 @@ async fn main() -> Result<()> {
     target_function();
 
     // Start eBPF monitoring
-    let manager = manager::Manager::new()?;
+    let mut manager = manager::Manager::new()?;
     manager.run().await?;
 
     Ok(())

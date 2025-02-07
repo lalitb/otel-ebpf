@@ -1,5 +1,5 @@
-use anyhow::Result;
 use crate::probe::Probe;
+use anyhow::Result;
 
 pub struct Manager {
     probe: Probe,
@@ -15,11 +15,11 @@ impl Manager {
     pub async fn run(&self) -> Result<()> {
         println!("Starting eBPF manager...");
         self.probe.attach().await?;
-        
+
         // Keep the program running
         tokio::signal::ctrl_c().await?;
         println!("Shutting down...");
-        
+
         Ok(())
     }
 }

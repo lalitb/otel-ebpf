@@ -3,8 +3,8 @@ use opentelemetry::global;
 use opentelemetry_sdk::trace::TracerProvider as SdkTracerProvider;
 use std::{thread::sleep, time::Duration};
 
-mod probe;
 mod manager;
+mod probe;
 
 #[inline(never)]
 fn target_function() {
@@ -18,7 +18,7 @@ async fn main() -> Result<()> {
         .with_simple_exporter(opentelemetry_stdout::SpanExporter::default())
         .build();
     global::set_tracer_provider(provider);
-    
+
     println!("Tracing initialized, waiting for setup...");
     sleep(Duration::from_secs(2));
 

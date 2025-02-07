@@ -1,11 +1,13 @@
 use anyhow::Result;
-use libbpf_rs::{Object, ObjectBuilder, Program};
+use libbpf_rs::{Link, Object, ObjectBuilder}; // Remove Program, add Link
 use std::{fs, path::PathBuf};
-use object::{Object as ElfObject, ObjectSymbolTable}; // Fix name conflicts
+use object::{Object as ElfObject, ObjectSymbol, ObjectSymbolTable}; // Add ObjectSymbol trait
 
 pub struct Probe {
     bpf_object: Object,
     target_fn_name: String,
+    // Store links to keep probes attached
+    _links: Vec<Link>,
 }
 
 impl Probe {
@@ -18,23 +20,27 @@ impl Probe {
         Ok(Self {
             bpf_object: obj,
             target_fn_name: "target_function".to_string(),
+            _links: Vec::new(),
         })
     }
 
-    pub async fn attach(&self) -> Result<()> {
+    pub async fn attach(&mut self) -> Result<()> {
         let binary_path = std::env::current_exe()?;
         let offset = self.find_function_offset(&self.target_fn_name)?;
+        let binary_path = binary_path.to_str().unwrap();
 
         // Attach uprobe
-        if let Some(prog) = self.bpf_object.progs().find(|p| p.name() == "trace_enter") {
-            prog.attach_uprobe(false, -1, binary_path.to_str().unwrap(), offset)?;
+        if let Some(prog) = self.bpf_object.prog("trace_enter") {
+            let link = prog.attach_uprobe(binary_path, 0, offset)?;
             println!("Attached entry probe at offset {:#x}", offset);
+            self._links.push(link);
         }
 
         // Attach uretprobe
-        if let Some(prog) = self.bpf_object.progs().find(|p| p.name() == "trace_exit") {
-            prog.attach_uretprobe(false, -1, binary_path.to_str().unwrap(), offset)?;
+        if let Some(prog) = self.bpf_object.prog("trace_exit") {
+            let link = prog.attach_uretprobe(binary_path, 0, offset)?;
             println!("Attached exit probe at offset {:#x}", offset);
+            self._links.push(link);
         }
 
         Ok(())

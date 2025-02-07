@@ -1,7 +1,7 @@
 use anyhow::Result;
 use libbpf_rs::{Link, Object, ObjectBuilder, ProgramMut};
 use std::{fs, path::PathBuf};
-use object::{Object as ElfObject, ObjectSymbol, ObjectSymbolTable}; // Ensure `ObjectSymbolTable` is included
+use object::{Object as ElfObject, ObjectSymbol, ObjectSymbolTable}; // Ensure ObjectSymbolTable is included
 
 pub struct Probe {
     bpf_object: Object,
@@ -26,18 +26,21 @@ impl Probe {
     pub async fn attach(&mut self) -> Result<()> {
         let binary_path = std::env::current_exe()?;
         let offset = self.find_function_offset(&self.target_fn_name)?;
+
+        // Convert `u64` to `usize`, safely handling potential overflow
+        let offset_usize = usize::try_from(offset).map_err(|_| anyhow::anyhow!("Offset too large"))?;
         let binary_path_str = binary_path.to_str().unwrap();
 
         // Attach uprobe
         if let Some(mut prog) = self.find_prog_mut("trace_enter") {
-            let link = prog.attach_uprobe_with_opts(-1, binary_path_str, offset, Default::default())?;
+            let link = prog.attach_uprobe_with_opts(-1, binary_path_str, offset_usize, Default::default())?;
             println!("Attached entry probe at offset {:#x}", offset);
             self._links.push(link);
         }
 
         // Attach uretprobe
         if let Some(mut prog) = self.find_prog_mut("trace_exit") {
-            let link = prog.attach_uprobe_with_opts(-1, binary_path_str, offset, Default::default())?;
+            let link = prog.attach_uprobe_with_opts(-1, binary_path_str, offset_usize, Default::default())?;
             println!("Attached exit probe at offset {:#x}", offset);
             self._links.push(link);
         }

@@ -1,12 +1,13 @@
 use anyhow::Result;
-use libbpf_rs::{Link, Object, ObjectBuilder, UprobeAttachOpts};
+use libbpf_rs::{Link, Object, ObjectBuilder}; // Removed UprobeAttachOpts
 use std::{fs, path::PathBuf};
-use object::{Object as ElfObject, ObjectSymbol, ObjectSymbolTable}; // Import missing traits
+use object::{Object as ElfObject, ObjectSymbol, ObjectSymbolTable}; // Add ObjectSymbol trait
 
 pub struct Probe {
     bpf_object: Object,
     target_fn_name: String,
-    _links: Vec<Link>, // Store links to keep probes attached
+    // Store links to keep probes attached
+    _links: Vec<Link>,
 }
 
 impl Probe {
@@ -28,18 +29,16 @@ impl Probe {
         let offset = self.find_function_offset(&self.target_fn_name)?;
         let binary_path_str = binary_path.to_str().unwrap();
 
-        let opts = UprobeAttachOpts::default();
-
-        // Attach uprobe (entry)
-        if let Some(prog) = self.bpf_object.progs().find(|p| p.name() == "trace_enter") {
-            let link = prog.attach_uprobe_opts(-1, binary_path_str, offset, &opts)?;
+        // Attach uprobe (entry probe)
+        if let Some(prog) = self.bpf_object.prog("trace_enter") {
+            let link = prog.attach_uprobe(false, -1, binary_path_str, offset)?;
             println!("Attached entry probe at offset {:#x}", offset);
             self._links.push(link);
         }
 
-        // Attach uretprobe (exit)
-        if let Some(prog) = self.bpf_object.progs().find(|p| p.name() == "trace_exit") {
-            let link = prog.attach_uretprobe_opts(-1, binary_path_str, offset, &opts)?;
+        // Attach uretprobe (return probe)
+        if let Some(prog) = self.bpf_object.prog("trace_exit") {
+            let link = prog.attach_uprobe(true, -1, binary_path_str, offset)?;
             println!("Attached exit probe at offset {:#x}", offset);
             self._links.push(link);
         }
@@ -52,10 +51,12 @@ impl Probe {
         let binary_data = fs::read(&binary_path)?;
         let obj_file = object::File::parse(&*binary_data)?;
 
-        if let Some(symbol_table) = obj_file.dynamic_symbol_table() {
+        if let Some(symbol_table) = obj_file.symbol_table() {
             for sym in symbol_table.symbols() {
-                if sym.name()? == function_name {
-                    return Ok(sym.address());
+                if let Ok(name) = sym.name() {
+                    if name == function_name {
+                        return Ok(sym.address());
+                    }
                 }
             }
         }

@@ -12,7 +12,7 @@ impl Manager {
         })
     }
 
-    pub async fn run(&self) -> Result<()> {
+    pub async fn run(&mut self) -> Result<()> {
         println!("Starting eBPF manager...");
         self.probe.attach().await?;
 

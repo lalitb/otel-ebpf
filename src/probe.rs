@@ -1,6 +1,8 @@
 use anyhow::Result;
 use libbpf_rs::{ObjectBuilder, Object};
 use std::{fs, path::PathBuf};
+use object::Object;
+
 
 pub struct Probe {
     bpf_object: Object,
@@ -25,13 +27,13 @@ impl Probe {
         let offset = self.find_function_offset(&self.target_fn_name)?;
         
         // Attach uprobe
-        if let Some(prog) = self.bpf_object.prog("trace_enter") {
+        if let Some(prog) = self.bpf_object.progs().find(|p| p.name() == "trace_enter") {
             prog.attach_uprobe(-1, binary_path.to_str().unwrap(), offset)?;
             println!("Attached entry probe at offset {:#x}", offset);
         }
 
         // Attach uretprobe
-        if let Some(prog) = self.bpf_object.prog("trace_exit") {
+        if let Some(prog) = self.bpf_object.progs().find(|p| p.name() == "trace_exit") {
             prog.attach_uretprobe(-1, binary_path.to_str().unwrap(), offset)?;
             println!("Attached exit probe at offset {:#x}", offset);
         }
@@ -44,7 +46,7 @@ impl Probe {
         let binary_data = fs::read(&binary_path)?;
         let obj_file = object::File::parse(&*binary_data)?;
 
-        for sym in obj_file.dynamic_symbols() {
+        for sym in obj_file.dynamic_symbol_table().symbols() {
             if let Ok(name) = sym.name() {
                 if name == function_name {
                     return Ok(sym.address());

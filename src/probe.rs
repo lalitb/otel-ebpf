@@ -1,11 +1,10 @@
 use anyhow::Result;
-use libbpf_rs::UprobeAttachType;
-use libbpf_rs::{Object as BpfObject, ObjectBuilder};
-use object::Object as ElfObject;
+use libbpf_rs::{ObjectBuilder, Object as BpfObject, UprobeAttachOpts, UprobeAttachType};
 use std::{fs, path::PathBuf};
+use object::Object as ElfObject; // Avoid conflict with BPF Object
 
 pub struct Probe {
-    bpf_object: Object,
+    bpf_object: BpfObject,
     target_fn_name: String,
 }
 
@@ -25,29 +24,18 @@ impl Probe {
     pub async fn attach(&self) -> Result<()> {
         let binary_path = std::env::current_exe()?;
         let offset = self.find_function_offset(&self.target_fn_name)?;
-        let opts = libbpf_rs::UprobeAttachOpts::default();
+
+        let opts = UprobeAttachOpts::default();
 
         // Attach uprobe
         if let Some(prog) = self.bpf_object.progs().find(|p| p.name() == "trace_enter") {
-            prog.attach_uprobe_opts(
-                UprobeAttachType::Entry,
-                -1,
-                binary_path.to_str().unwrap(),
-                offset,
-                &opts,
-            )?;
+            prog.attach_uprobe_opts(UprobeAttachType::Entry, -1, binary_path.to_str().unwrap(), offset, &opts)?;
             println!("Attached entry probe at offset {:#x}", offset);
         }
 
         // Attach uretprobe
         if let Some(prog) = self.bpf_object.progs().find(|p| p.name() == "trace_exit") {
-            prog.attach_uprobe_opts(
-                UprobeAttachType::Return,
-                -1,
-                binary_path.to_str().unwrap(),
-                offset,
-                &opts,
-            )?;
+            prog.attach_uprobe_opts(UprobeAttachType::Return, -1, binary_path.to_str().unwrap(), offset, &opts)?;
             println!("Attached exit probe at offset {:#x}", offset);
         }
 

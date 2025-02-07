@@ -1,7 +1,7 @@
 use anyhow::Result;
 use libbpf_rs::{Link, Object, ObjectBuilder, Program};
 use std::{fs, path::PathBuf};
-use object::{Object as ElfObject, ObjectSymbol, ObjectSymbolTable};
+use object::{Object as ElfObject, ObjectSymbol, ObjectSymbolTable}; // Ensure `ObjectSymbolTable` is included
 
 pub struct Probe {
     bpf_object: Object,
@@ -28,16 +28,16 @@ impl Probe {
         let offset = self.find_function_offset(&self.target_fn_name)?;
         let binary_path_str = binary_path.to_str().unwrap();
 
-        // Find and attach the entry probe
-        if let Some(prog) = self.find_prog("trace_enter") {
-            let link = prog.attach_uprobe(false, -1, binary_path_str, offset)?;
+        // Attach uprobe
+        if let Some(mut prog) = self.find_prog("trace_enter") {
+            let link = prog.attach_uprobe_with_opts(-1, binary_path_str, offset, Default::default())?;
             println!("Attached entry probe at offset {:#x}", offset);
             self._links.push(link);
         }
 
-        // Find and attach the exit probe
-        if let Some(prog) = self.find_prog("trace_exit") {
-            let link = prog.attach_uprobe(true, -1, binary_path_str, offset)?;
+        // Attach uretprobe
+        if let Some(mut prog) = self.find_prog("trace_exit") {
+            let link = prog.attach_uprobe_with_opts(-1, binary_path_str, offset, Default::default())?;
             println!("Attached exit probe at offset {:#x}", offset);
             self._links.push(link);
         }
@@ -45,7 +45,7 @@ impl Probe {
         Ok(())
     }
 
-    fn find_prog(&self, name: &str) -> Option<&Program> {
+    fn find_prog(&self, name: &str) -> Option<Program> {
         self.bpf_object.progs().find(|prog| prog.name() == name)
     }
 

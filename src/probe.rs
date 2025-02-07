@@ -25,7 +25,7 @@ impl Probe {
 
     pub async fn attach(&mut self) -> Result<()> {
         //let binary_path = std::env::current_exe()?;
-        let binary_path = "/home/ubuntu/otel-ebpf/target/debug/otel-ebpf";
+        let binary_path = "/home/ubuntu/otel-ebpf/target/debug/otel-ebpf".to_string();
         let offset = self.find_function_offset(&self.target_fn_name)?;
 
         // Convert `u64` to `usize`, safely handling potential overflow

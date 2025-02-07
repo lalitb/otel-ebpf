@@ -1,5 +1,5 @@
 use anyhow::Result;
-use libbpf_rs::{Link, Object, ObjectBuilder, Program};
+use libbpf_rs::{Link, Object, ObjectBuilder, ProgramMut};
 use std::{fs, path::PathBuf};
 use object::{Object as ElfObject, ObjectSymbol, ObjectSymbolTable}; // Ensure `ObjectSymbolTable` is included
 
@@ -29,14 +29,14 @@ impl Probe {
         let binary_path_str = binary_path.to_str().unwrap();
 
         // Attach uprobe
-        if let Some(mut prog) = self.find_prog("trace_enter") {
+        if let Some(mut prog) = self.find_prog_mut("trace_enter") {
             let link = prog.attach_uprobe_with_opts(-1, binary_path_str, offset, Default::default())?;
             println!("Attached entry probe at offset {:#x}", offset);
             self._links.push(link);
         }
 
         // Attach uretprobe
-        if let Some(mut prog) = self.find_prog("trace_exit") {
+        if let Some(mut prog) = self.find_prog_mut("trace_exit") {
             let link = prog.attach_uprobe_with_opts(-1, binary_path_str, offset, Default::default())?;
             println!("Attached exit probe at offset {:#x}", offset);
             self._links.push(link);
@@ -45,8 +45,9 @@ impl Probe {
         Ok(())
     }
 
-    fn find_prog(&self, name: &str) -> Option<Program> {
-        self.bpf_object.progs().find(|prog| prog.name() == name)
+    /// Find a mutable reference to a program by name
+    fn find_prog_mut(&mut self, name: &str) -> Option<ProgramMut> {
+        self.bpf_object.progs_mut().find(|prog| prog.name() == name)
     }
 
     fn find_function_offset(&self, function_name: &str) -> Result<u64> {

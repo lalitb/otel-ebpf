@@ -6,8 +6,8 @@ use std::{thread::sleep, time::Duration};
 mod manager;
 mod probe;
 
-#[inline(never)]
-fn target_function() {
+#[no_mangle]
+pub extern "C" fn target_function() {
     println!("🚀 target_function() is executing...");
 }
 

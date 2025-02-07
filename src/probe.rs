@@ -1,53 +1,45 @@
-use libbpf_rs::{ObjectBuilder, MapCore};
 use anyhow::Result;
-use std::fs;
-use std::path::PathBuf;
-use std::sync::Arc;
-use tokio::sync::Mutex;
+use libbpf_rs::{ObjectBuilder, Object};
+use std::{fs, path::PathBuf};
 
 pub struct Probe {
-    pub(crate) bpf_object: Arc<Mutex<libbpf_rs::Object>>,
-    name: String,
+    bpf_object: Object,
+    target_fn_name: String,
 }
 
 impl Probe {
     pub fn new() -> Result<Self> {
-        let out_dir = std::env::var("OUT_DIR").unwrap_or_else(|_| "target/debug".to_string());
-        let bpf_path = PathBuf::from(out_dir).join("probe.bpf.o");
-
-        let open_obj = ObjectBuilder::default().open_file(bpf_path.to_str().unwrap())?;
-        let obj = open_obj.load()?;
-        println!("Loaded eBPF program for target_function");
+        let bpf_path = PathBuf::from("target").join("bpf").join("probe.bpf.o");
+        let obj = ObjectBuilder::default()
+            .open_file(bpf_path.to_str().unwrap())?
+            .load()?;
 
         Ok(Self {
-            bpf_object: Arc::new(Mutex::new(obj)),
-            name: "target_function".to_string(),
+            bpf_object: obj,
+            target_fn_name: "target_function".to_string(),
         })
     }
 
-    pub async fn attach(&mut self) -> Result<()> {
-        let bpf_object = self.bpf_object.lock().await;
+    pub async fn attach(&self) -> Result<()> {
         let binary_path = std::env::current_exe()?;
-        let offset = Self::find_function_offset("target_function")?;
-
-        println!("Found target_function at offset: {:#x}", offset);
-
-        // Attach entry probe (uprobe)
-        if let Some(prog) = bpf_object.prog("trace_enter") {
+        let offset = self.find_function_offset(&self.target_fn_name)?;
+        
+        // Attach uprobe
+        if let Some(prog) = self.bpf_object.prog("trace_enter") {
             prog.attach_uprobe(-1, binary_path.to_str().unwrap(), offset)?;
-            println!("Attached uprobe for target_function");
+            println!("Attached entry probe at offset {:#x}", offset);
         }
 
-        // Attach exit probe (uretprobe)
-        if let Some(prog) = bpf_object.prog("trace_exit") {
+        // Attach uretprobe
+        if let Some(prog) = self.bpf_object.prog("trace_exit") {
             prog.attach_uretprobe(-1, binary_path.to_str().unwrap(), offset)?;
-            println!("Attached uretprobe for target_function");
+            println!("Attached exit probe at offset {:#x}", offset);
         }
 
         Ok(())
     }
 
-    fn find_function_offset(function_name: &str) -> Result<u64> {
+    fn find_function_offset(&self, function_name: &str) -> Result<u64> {
         let binary_path = std::env::current_exe()?;
         let binary_data = fs::read(&binary_path)?;
         let obj_file = object::File::parse(&*binary_data)?;

@@ -1,32 +1,33 @@
-mod probe;
-mod manager;
-
 use anyhow::Result;
 use opentelemetry::global;
 use opentelemetry_sdk::trace::TracerProvider as SdkTracerProvider;
 use std::{thread::sleep, time::Duration};
-use tracing::info;
+
+mod probe;
+mod manager;
 
 #[inline(never)]
 fn target_function() {
     println!("🚀 target_function() is executing...");
 }
 
-#[tokio::main(flavor = "multi_thread")]
+#[tokio::main]
 async fn main() -> Result<()> {
-    // Initialize OpenTelemetry
-    let exporter = opentelemetry_stdout::SpanExporter::default();
+    // Initialize OpenTelemetry with stdout exporter
     let provider = SdkTracerProvider::builder()
-        .with_simple_exporter(exporter)
+        .with_simple_exporter(opentelemetry_stdout::SpanExporter::default())
         .build();
     global::set_tracer_provider(provider);
-    info!("OpenTelemetry tracing initialized");
+    
+    println!("Tracing initialized, waiting for setup...");
+    sleep(Duration::from_secs(2));
 
-    sleep(Duration::from_secs(5)); // Ensure tracing is ready
+    // Execute monitored function
+    target_function();
 
-    target_function(); // This function should be traced
-
+    // Start eBPF monitoring
     let manager = manager::Manager::new()?;
     manager.run().await?;
+
     Ok(())
 }

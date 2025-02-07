@@ -1,6 +1,5 @@
-use crate::probe::Probe;
 use anyhow::Result;
-use tokio::task::LocalSet;
+use crate::probe::Probe;
 
 pub struct Manager {
     probe: Probe,
@@ -14,17 +13,13 @@ impl Manager {
     }
 
     pub async fn run(&self) -> Result<()> {
-        println!("Running manager...");
-
-        let local_set = LocalSet::new();
-        let mut probe = self.probe;
-
-        local_set.spawn_local(async move {
-            probe.attach().await.expect("Failed to attach probe");
-            println!("Attached probe for target_function");
-        });
-
-        local_set.await;
+        println!("Starting eBPF manager...");
+        self.probe.attach().await?;
+        
+        // Keep the program running
+        tokio::signal::ctrl_c().await?;
+        println!("Shutting down...");
+        
         Ok(())
     }
 }

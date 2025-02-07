@@ -7,6 +7,7 @@ mod manager;
 mod probe;
 
 #[no_mangle]
+#[inline(never)]
 pub extern "C" fn target_function() {
     println!("🚀 target_function() is executing...");
 }
